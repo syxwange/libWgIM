@@ -38,9 +38,21 @@
     <ClCompile Include="tcp_client.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="dht.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="utiliy.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cryptocore.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="libwgim.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="utiliy.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -57,6 +69,12 @@
       <Filter>Header Files</Filter>
     </QtMoc>
     <QtMoc Include="tcp_client.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="dht.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="cryptocore.h">
       <Filter>Header Files</Filter>
     </QtMoc>
   </ItemGroup>

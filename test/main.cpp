@@ -5,12 +5,31 @@
 #pragma comment(lib,"../x64/debug/libWgIM.lib")
 
 #pragma comment(lib,"libsodium.lib")
+#include "../libWgIM/messenger.h"
 
+#include "../libWgIM/utiliy.h"
 int main(int argc, char *argv[])
 {
 	QCoreApplication a(argc, argv);
 	auto i = sodium_init();
-	libWgIM m;
-	std::cout << m.add(3, 5)<<i;
+	Messenger m;
+	auto ret = m.init();
+	Utiliy::unixTimeUpdate();	
+	std::cout <<"unixBaseTimeValue:"<< Utiliy::unixBaseTimeValue<<"lastMonotime:"<<Utiliy::lastMonotime<< "unixTimeValue:" << Utiliy::unixTimeValue<< "     "<<Utiliy::currentTimeMonotonic()<<std::endl;
+	Utiliy::unixTimeUpdate();
+	std::cout << "unixBaseTimeValue:" << Utiliy::unixBaseTimeValue << "lastMonotime:" << Utiliy::lastMonotime << "unixTimeValue:" << Utiliy::unixTimeValue << "     " << Utiliy::currentTimeMonotonic() << std::endl;
+	Utiliy::unixTimeUpdate();
+	std::cout << "unixBaseTimeValue:" << Utiliy::unixBaseTimeValue << "lastMonotime:" << Utiliy::lastMonotime << "unixTimeValue:" << Utiliy::unixTimeValue << "     " << Utiliy::currentTimeMonotonic() << std::endl;
+	Utiliy::unixTimeUpdate();
+	std::cout << "unixBaseTimeValue:" << Utiliy::unixBaseTimeValue << "lastMonotime:" << Utiliy::lastMonotime << "unixTimeValue:" << Utiliy::unixTimeValue << "     " << Utiliy::currentTimeMonotonic() << std::endl;
+
+	Sleep(3000);
+	Utiliy::unixTimeUpdate();
+	std::cout << "unixBaseTimeValue:" << Utiliy::unixBaseTimeValue << "lastMonotime:" << Utiliy::lastMonotime << "unixTimeValue:" << Utiliy::unixTimeValue << "     " << Utiliy::currentTimeMonotonic() << std::endl;
+
+	Sleep(30000);
+	Utiliy::unixTimeUpdate();
+	std::cout << "unixBaseTimeValue:" << Utiliy::unixBaseTimeValue << "lastMonotime:" << Utiliy::lastMonotime << "unixTimeValue:" << Utiliy::unixTimeValue << "     " << Utiliy::currentTimeMonotonic() << std::endl;
+
 	return a.exec();
 }

@@ -1,5 +1,6 @@
 #include "network.h"
 #include "sodium.h"
+
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib,"libsodium.lib")
 
@@ -126,7 +127,8 @@ int Networking_Core::init(const IP& ip, uint16_t port_from, uint16_t port_to)
 	*portptr = htons(port_to_try);
 	int tries;
 
-	for (tries = port_from; tries <= port_to; tries++) {
+	for (tries = port_from; tries <= port_to; tries++)
+	{
 		int res = bind(m_sock, (struct sockaddr*) & addr, addrsize);
 
 		if (!res)

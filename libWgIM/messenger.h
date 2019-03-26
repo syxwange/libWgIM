@@ -5,6 +5,9 @@
 #include "libwgim_global.h"
 #include "tcp_client.h"
 
+#include <memory>
+#include "dht.h"
+
 typedef struct {
 	uint8_t ipv6enabled;
 	uint8_t udp_disabled;
@@ -25,8 +28,19 @@ public:
 
 	int init();
 
+	enum  MESSENGER_ERROR {
+		MESSENGER_ERROR_NONE,
+		MESSENGER_ERROR_PORT,
+		MESSENGER_ERROR_TCP_SERVER,
+		MESSENGER_ERROR_DHT,
+		MESSENGER_ERROR_OTHER
+	};
+
 private:
-	Networking_Core  m_net{};
+	std::shared_ptr<Networking_Core>   m_net{new Networking_Core};	
 	Messenger_Options m_messengerOption {};
+	std::shared_ptr<DHT> m_dht{new DHT};
 	unsigned int m_error = 0;
+
+	
 };

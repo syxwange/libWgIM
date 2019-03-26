@@ -97,12 +97,24 @@
     </QtMoc>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="cryptocore.cpp" />
+    <ClCompile Include="dht.cpp" />
     <ClCompile Include="libwgim.cpp" />
     <ClCompile Include="messenger.cpp" />
     <ClCompile Include="network.cpp" />
     <ClCompile Include="tcp_client.cpp" />
+    <ClCompile Include="utiliy.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <QtMoc Include="cryptocore.h">
+      <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\GeneratedFiles;.\..\include;.;$(QTDIR)\include;.\GeneratedFiles\$(ConfigurationName);$(QTDIR)\include\QtCore</IncludePath>
+      <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.\GeneratedFiles;.;$(QTDIR)\include;.\GeneratedFiles\$(ConfigurationName);$(QTDIR)\include\QtCore</IncludePath>
+    </QtMoc>
+    <ClInclude Include="utiliy.h" />
+    <QtMoc Include="dht.h">
+      <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\GeneratedFiles;.\..\include;.;$(QTDIR)\include;.\GeneratedFiles\$(ConfigurationName);$(QTDIR)\include\QtCore</IncludePath>
+      <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.\GeneratedFiles;.;$(QTDIR)\include;.\GeneratedFiles\$(ConfigurationName);$(QTDIR)\include\QtCore</IncludePath>
+    </QtMoc>
     <ClInclude Include="libwgim.h" />
     <ClInclude Include="libwgim_global.h" />
     <QtMoc Include="tcp_client.h" />
