@@ -93,6 +93,107 @@ uint32_t id_copy(uint8_t* dest, const uint8_t* src)
 	return crypto_box_PUBLICKEYBYTES;
 }
 
+
+/* checks if ip is valid */
+bool  ip_isset(const IP* ip)
+{
+	if (!ip)
+		return 0;
+
+	return (ip->family != 0);
+}
+
+/* nulls out ip */
+void ip_reset(IP* ip)
+{
+	if (!ip)
+		return;
+	memset(ip, 0, sizeof(IP));
+}
+
+/* copies an ip_port structure (careful about direction!) */
+void ipport_copy(IP_Port* target, const IP_Port* source)
+{
+	if (!source || !target)
+		return;
+
+	memcpy(target, source, sizeof(IP_Port));
+}
+
+/* ip_equal
+ *  compares two IPAny structures *  unset means unequal
+ * returns 0 when not equal or when uninitialized */
+int ip_equal(const IP* a, const IP* b)
+{
+	if (!a || !b)
+		return 0;
+
+	/* same family */
+	if (a->family == b->family) {
+		if (a->family == AF_INET)
+			return (a->ip4.in_addr.s_addr == b->ip4.in_addr.s_addr);
+		else if (a->family == AF_INET6)
+			return a->ip6.uint64[0] == b->ip6.uint64[0] && a->ip6.uint64[1] == b->ip6.uint64[1];
+		else
+			return 0;
+	}
+
+	/* different family: check on the IPv6 one if it is the IPv4 one embedded */
+	if ((a->family == AF_INET) && (b->family == AF_INET6)) {
+		if (IPV6_IPV4_IN_V6(b->ip6))
+			return (a->ip4.in_addr.s_addr == b->ip6.uint32[3]);
+	}
+	else if ((a->family == AF_INET6) && (b->family == AF_INET)) {
+		if (IPV6_IPV4_IN_V6(a->ip6))
+			return (a->ip6.uint32[3] == b->ip4.in_addr.s_addr);
+	}
+
+	return 0;
+}
+
+
+/* ipport_equal *  compares two IPAny_Port structures *  unset means unequal
+ *
+ * returns 0 when not equal or when uninitialized
+ */
+int ipport_equal(const IP_Port* a, const IP_Port* b)
+{
+	if (!a || !b)
+		return 0;
+
+	if (!a->port || (a->port != b->port))
+		return 0;
+	
+	return ip_equal(&a->ip, &b->ip);
+}
+
+
+
+
+
+/* Compares pk1 and pk2 with pk. *
+ *  return 0 if both are same distance.
+ *  return 1 if pk1 is closer.
+ *  return 2 if pk2 is closer.
+ */
+int id_closest(const uint8_t* pk, const uint8_t* pk1, const uint8_t* pk2)
+{
+	size_t   i;
+	uint8_t distance1, distance2;
+	for (i = 0; i < crypto_box_PUBLICKEYBYTES; ++i) {
+
+		distance1 = pk[i] ^ pk1[i];
+		distance2 = pk[i] ^ pk2[i];
+
+		if (distance1 < distance2)
+			return 1;
+		if (distance1 > distance2)
+			return 2;
+	}
+	return 0;
+}
+
+
 ///===Ping_Array=========================================================
 
 static void clear_entry(Ping_Array* array, uint32_t index)

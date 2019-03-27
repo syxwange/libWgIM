@@ -41,3 +41,47 @@ void CryptoCore::newNonce(uint8_t* nonce)
 {
 	randomNonce(nonce);
 }
+
+int CryptoCore::encryptDataSymmetric(const uint8_t* secret_key, const uint8_t* nonce, const uint8_t* plain,  uint32_t length,	uint8_t* encrypted)
+{
+	if (length == 0 || !secret_key || !nonce || !plain || !encrypted)
+		return -1;
+
+	uint8_t * temp_plain=new uint8_t[length + crypto_box_ZEROBYTES];
+	uint8_t *temp_encrypted=new uint8_t[length + crypto_box_MACBYTES + crypto_box_BOXZEROBYTES];
+
+	memset(temp_plain, 0, crypto_box_ZEROBYTES);
+	memcpy(temp_plain + crypto_box_ZEROBYTES, plain, length); // Pad the message with 32 0 bytes.
+
+	if (crypto_box_afternm(temp_encrypted, temp_plain, length + crypto_box_ZEROBYTES, nonce, secret_key) != 0)
+		return -1;
+
+	/* Unpad the encrypted message. */
+	memcpy(encrypted, temp_encrypted + crypto_box_BOXZEROBYTES, length + crypto_box_MACBYTES);
+
+	delete[] temp_plain;
+	delete[] temp_encrypted;
+	return length + crypto_box_MACBYTES;
+}
+
+int CryptoCore::decryptDataSymmetric(const uint8_t* secret_key, const uint8_t* nonce, const uint8_t* encrypted, uint32_t length,	uint8_t* plain)
+{
+	if (length <= crypto_box_BOXZEROBYTES || !secret_key || !nonce || !encrypted || !plain)
+		return -1;
+
+	uint8_t *temp_plain=new uint8_t[length + crypto_box_ZEROBYTES];
+	uint8_t *temp_encrypted = new uint8_t[length + crypto_box_BOXZEROBYTES];
+
+	memset(temp_encrypted, 0, crypto_box_BOXZEROBYTES);
+	memcpy(temp_encrypted + crypto_box_BOXZEROBYTES, encrypted, length); // Pad the message with 16 0 bytes.
+
+	if (crypto_box_open_afternm(temp_plain, temp_encrypted, length + crypto_box_BOXZEROBYTES, nonce, secret_key) != 0)
+		return -1;
+
+	memcpy(plain, temp_plain + crypto_box_ZEROBYTES, length - crypto_box_MACBYTES);
+
+	delete[] temp_plain;
+	delete[] temp_encrypted;
+	return length - crypto_box_MACBYTES;
+}
+

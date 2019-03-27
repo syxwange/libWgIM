@@ -5,6 +5,7 @@
 
 #include "libwgim_global.h"
 #include <pthread.h>
+#include "network.h"
 
 #define _CRT_NO_TIME_T
 #define MIN(a,b) (((a)<(b))?(a):(b))
@@ -32,6 +33,12 @@ bool id_equal(const uint8_t* dest, const uint8_t* src);
 uint32_t id_copy(uint8_t* dest, const uint8_t* src);
 ///==================================
 uint64_t random_64b(void);
+bool  ip_isset(const IP* ip);
+void ip_reset(IP* ip);
+void ipport_copy(IP_Port* target, const IP_Port* source);
+int ipport_equal(const IP_Port* a, const IP_Port* b);
+int ip_equal(const IP* a, const IP* b);
+int id_closest(const uint8_t* pk, const uint8_t* pk1, const uint8_t* pk2);
 ///===Ping_Array====start=====================================================
 
 typedef struct {

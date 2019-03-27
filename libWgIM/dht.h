@@ -154,8 +154,16 @@ public:
 	int init(std::shared_ptr<Networking_Core> net);
 	uint8_t* selfPublicKey() { return m_selfPublicKey; }
 	void getSharedKeySent(uint8_t* shared_key, const uint8_t* public_key);
+	void getSharedKeyRecv(uint8_t* shared_key, const uint8_t* public_key);
+	bool nodeAddableToCloseList(const uint8_t* public_key, IP_Port ip_port);
+	int addToClose(const uint8_t* public_key, IP_Port ip_port, bool simulate);
+	bool addToList(Node_format* nodes_list, unsigned int length, const uint8_t* pk, IP_Port ip_port, const uint8_t* cmp_pk);
+	unsigned int bitByBitCmp(const uint8_t* pk1, const uint8_t* pk2);
+	int getfriendip(const uint8_t* public_key, IP_Port* ip_port);
 
-
+	std::shared_ptr<Networking_Core> getNetwork() { return m_net; }
+	Ping* getPing() { return m_ping; }
+	Client_data* getCloseClientList(){ return m_closeClientlist; }
 private:
 	void getSharedKey(Shared_Keys* shared_keys, uint8_t* shared_key, const uint8_t* secret_key, const uint8_t* public_key);
 

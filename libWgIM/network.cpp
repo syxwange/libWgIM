@@ -4,6 +4,8 @@
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib,"libsodium.lib")
 
+#define loglogdata(__message__, __buffer__, __buflen__, __ip_port__, __res__)
+
 NetWork::NetWork(QObject *parent)	: QObject(parent)
 {
 }
@@ -203,4 +205,79 @@ int Networking_Core::setSocketDualstack(sock_t sock)
 
 	ipv6only = 0;
 	return (setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)& ipv6only, sizeof(ipv6only)) == 0);
+}
+
+
+/* Basic network functions: Function to send packet(data) of length length to ip_port.
+ *基本网络功能：将长度为length的数据包（数据）发送到ip_port的功能。*/
+int Networking_Core::sendpacket(IP_Port ip_port, const uint8_t* data, uint16_t length)
+{
+	if (m_family == 0) /* Socket not initialized */
+		return -1;
+
+	/* socket AF_INET, but target IP NOT: can't send */
+	if ((m_family == AF_INET) && (ip_port.ip.family != AF_INET))
+		return -1;
+
+	struct sockaddr_storage addr;
+	size_t addrsize = 0;
+
+	if (ip_port.ip.family == AF_INET)
+	{
+		if (m_family == AF_INET6) 
+		{
+			/* must convert to IPV4-in-IPV6 address */
+			struct sockaddr_in6* addr6 = (struct sockaddr_in6*) & addr;
+
+			addrsize = sizeof(struct sockaddr_in6);
+			addr6->sin6_family = AF_INET6;
+			addr6->sin6_port = ip_port.port;
+
+			/* there should be a macro for this in a standards compliant
+			 * environment, not found */
+			IP6 ip6;
+
+			ip6.uint32[0] = 0;
+			ip6.uint32[1] = 0;
+			ip6.uint32[2] = htonl(0xFFFF);
+			ip6.uint32[3] = ip_port.ip.ip4.uint32;
+			addr6->sin6_addr = ip6.in6_addr;
+
+			addr6->sin6_flowinfo = 0;
+			addr6->sin6_scope_id = 0;
+		}
+		else {
+			struct sockaddr_in* addr4 = (struct sockaddr_in*) & addr;
+
+			addrsize = sizeof(struct sockaddr_in);
+			addr4->sin_family = AF_INET;
+			addr4->sin_addr = ip_port.ip.ip4.in_addr;
+			addr4->sin_port = ip_port.port;
+		}
+	}
+	else if (ip_port.ip.family == AF_INET6) {
+		struct sockaddr_in6* addr6 = (struct sockaddr_in6*) & addr;
+
+		addrsize = sizeof(struct sockaddr_in6);
+		addr6->sin6_family = AF_INET6;
+		addr6->sin6_port = ip_port.port;
+		addr6->sin6_addr = ip_port.ip.ip6.in6_addr;
+
+		addr6->sin6_flowinfo = 0;
+		addr6->sin6_scope_id = 0;
+	}
+	else {
+		/* unknown address type*/
+		return -1;
+	}
+	int res = sendto(m_sock, (char*)data, length, 0, (struct sockaddr*) & addr, addrsize);
+	loglogdata("O=>", data, length, ip_port, res);
+	return res;
+}
+
+void Networking_Core::networkingRegisterhandler(uint8_t byte, packet_handler_callback cb, void* object)
+{	
+
+	m_packethandlers[byte].function = cb;
+	m_packethandlers[byte].object = object;
 }

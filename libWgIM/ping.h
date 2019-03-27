@@ -24,6 +24,12 @@ public:
 	~Ping();
 	int init(std::shared_ptr<DHT> dht);
 	int sendPingRequest(IP_Port ipp, const uint8_t* public_key);
+	int sendPingResponse(IP_Port ipp, const uint8_t* public_key, uint64_t ping_id, uint8_t* shared_encryption_key);
+	int inList(const Client_data* list, uint16_t length, const uint8_t* public_key, IP_Port ip_port);
+	int addToPing(const uint8_t* public_key, IP_Port ip_port);
+
+	std::shared_ptr<DHT> getDHT() { return m_dht; }
+	Ping_Array getpingArray() { return m_pingArray; }
 
 private:
 	std::shared_ptr<DHT> m_dht = nullptr;

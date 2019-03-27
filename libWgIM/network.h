@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <QObject>
 
@@ -49,6 +49,23 @@
 #define TCP_INET6 (AF_INET6 + 3)
 #define TCP_FAMILY (AF_INET6 + 4)
 
+
+/* Does the IP6 struct a contain an IPv4 address in an IPv6 one? */
+#define IPV6_IPV4_IN_V6(a) ((a.uint64[0] == 0) && (a.uint32[2] == htonl (0xffff)))
+
+#define SIZE_IP4 4
+#define SIZE_IP6 16
+#define SIZE_IP (1 + SIZE_IP6)
+#define SIZE_PORT 2
+#define SIZE_IPPORT (SIZE_IP + SIZE_PORT)
+
+#define TOX_ENABLE_IPV6_DEFAULT 1
+
+/* addr_resolve return values */
+#define TOX_ADDR_RESOLVE_INET  1
+#define TOX_ADDR_RESOLVE_INET6 2
+
+
 typedef unsigned int sock_t;
 /* sa_family_t is the sockaddr_in / sockaddr_in6 family field */
 typedef short sa_family_t;
@@ -84,9 +101,9 @@ typedef struct {
 
 
 /* Function to receive data, ip and port of sender is put into ip_port.
- * Packet data is put into data.
- * Packet length is put into length.
- */
+ * Packet data is put into data. * Packet length is put into length.
+ *æ¥æ”¶æ•°æ®ï¼Œipå’Œå‘é€ç«¯å£çš„å‡½æ•°æ”¾å…¥ip_portã€‚
+Â *åˆ†ç»„æ•°æ®è¢«æ”¾å…¥dataã€‚Â *æ•°æ®åŒ…é•¿åº¦lenã€‚ */
 typedef int (*packet_handler_callback)(void* object, IP_Port ip_port, const uint8_t* data, uint16_t len);
 
 typedef struct {
@@ -103,11 +120,13 @@ public:
 	int init(const IP & ip, uint16_t port_from, uint16_t port_to);
 	~Networking_Core();
 
-	//µ÷ÓÃWSAStartup£¨£©Èçµ÷ÓÃËùÇëÇóµÄSocket¿â£¬²¢³õÊ¼»¯libsodium¿â £¬³É¹¦m_startupRan=1
+	//è°ƒç”¨WSAStartupï¼ˆï¼‰å¦‚è°ƒç”¨æ‰€è¯·æ±‚çš„Socketåº“ï¼Œå¹¶åˆå§‹åŒ–libsodiumåº“ ï¼ŒæˆåŠŸm_startupRan=1
 	int networkStartup();
-	//ÉèÖÃsocketÊÇIPv4 + IPv6Ë«Ä£Ê½
+	//è®¾ç½®socketæ˜¯IPv4 + IPv6åŒæ¨¡å¼
 	int setSocketDualstack(sock_t sock);
 	static uint64_t currentTimeActual(void);
+	int sendpacket(IP_Port ip_port, const uint8_t* data, uint16_t length);
+	void networkingRegisterhandler(uint8_t byte, packet_handler_callback cb, void* object);
 
 private:
 
@@ -118,7 +137,7 @@ private:
 	sock_t m_sock=0;
 	unsigned int  m_error = 0;
 
-	//µ÷ÓÃWSAStartup£¨£©Èçµ÷ÓÃËùÇëÇóµÄSocket¿â£¬²¢³õÊ¼»¯libsodium¿â £¬³É¹¦m_startupRan=1
+	//è°ƒç”¨WSAStartupï¼ˆï¼‰å¦‚è°ƒç”¨æ‰€è¯·æ±‚çš„Socketåº“ï¼Œå¹¶åˆå§‹åŒ–libsodiumåº“ ï¼ŒæˆåŠŸm_startupRan=1
 	uint8_t m_startupRan = 0;
 } ;
 
