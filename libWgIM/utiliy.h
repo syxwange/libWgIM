@@ -39,6 +39,12 @@ void ipport_copy(IP_Port* target, const IP_Port* source);
 int ipport_equal(const IP_Port* a, const IP_Port* b);
 int ip_equal(const IP* a, const IP* b);
 int id_closest(const uint8_t* pk, const uint8_t* pk1, const uint8_t* pk2);
+const char* ip_ntoa(const IP* ip);
+
+
+/////===========================LAN
+int LAN_ip(IP ip);
+bool Local_ip(IP ip);
 ///===Ping_Array====start=====================================================
 
 typedef struct {

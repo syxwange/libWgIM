@@ -158,6 +158,7 @@ public:
 	bool nodeAddableToCloseList(const uint8_t* public_key, IP_Port ip_port);
 	int addToClose(const uint8_t* public_key, IP_Port ip_port, bool simulate);
 	bool addToList(Node_format* nodes_list, unsigned int length, const uint8_t* pk, IP_Port ip_port, const uint8_t* cmp_pk);
+	int addtoLists(IP_Port ip_port, const uint8_t* public_key);
 	unsigned int bitByBitCmp(const uint8_t* pk1, const uint8_t* pk2);
 	int getfriendip(const uint8_t* public_key, IP_Port* ip_port);
 

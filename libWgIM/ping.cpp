@@ -83,7 +83,7 @@ static int handle_ping_response(void* _dht, IP_Port source, const uint8_t * pack
 	if (!ipport_equal(&ipp, &source))
 		return 1;
 
-	 (dht, source, packet + 1);
+	dht->addtoLists(source, packet + 1);
 	return 0;
 }
 
