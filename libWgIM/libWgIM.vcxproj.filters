@@ -47,12 +47,18 @@
     <ClCompile Include="cryptocore.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ping.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="libwgim.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="utiliy.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ping.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

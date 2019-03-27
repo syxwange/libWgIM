@@ -2,10 +2,8 @@
 #include <time.h>
 
 #include "utiliy.h"
-//
-#include <Windows.h>
-#include <sysinfoapi.h>
-
+#include <sodium.h>
+#include "cryptocore.h"
 
 /* don't call into system billions of times for no reason */
 uint64_t Utiliy::unixTimeValue=0;
@@ -49,7 +47,7 @@ static uint64_t add_monotime;
 uint64_t current_time_monotonic(void)
 {
 	uint64_t time;
-	time = (uint64_t)GetTickCount() + add_monotime;
+	time = (uint64_t)GetTickCount64() + add_monotime;
 	if (time < last_monotime) { /* Prevent time from ever decreasing because of 32 bit wrap. */
 		uint32_t add = ~0;
 		add_monotime += add;
@@ -77,8 +75,6 @@ int is_timeout(uint64_t timestamp, uint64_t timeout)
 	return timestamp + timeout <= unix_time();
 }
 
-#include <sodium.h>
-
 uint64_t random_64b(void)
 {
 	uint64_t randnum;
@@ -86,6 +82,16 @@ uint64_t random_64b(void)
 	return randnum;
 }
 
+bool id_equal(const uint8_t* dest, const uint8_t* src)
+{
+	return CryptoCore::publicKeyCmp(dest, src) == 0;	
+}
+
+uint32_t id_copy(uint8_t* dest, const uint8_t* src)
+{
+	memcpy(dest, src, crypto_box_PUBLICKEYBYTES);
+	return crypto_box_PUBLICKEYBYTES;
+}
 
 ///===Ping_Array=========================================================
 

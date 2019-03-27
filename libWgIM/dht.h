@@ -42,7 +42,7 @@
 *  要添加的“假”朋友的数量（为了优化目的，所以我们的洋葱部分的路径更随机）*/
 #define DHT_FAKE_FRIEND_NUMBER 2
 
-class Networking_Core;
+
 
 typedef struct {
 	/* Node routes request correctly  节点路由请求正确 (true (1) or false/didn't check (0)) */
@@ -139,6 +139,10 @@ typedef struct {
 } Cryptopacket_Handles;
 
 
+class Networking_Core;
+class Ping;
+
+
 class DHT : public QObject
 {
 	Q_OBJECT
@@ -148,6 +152,12 @@ public:
 	~DHT();
 
 	int init(std::shared_ptr<Networking_Core> net);
+	uint8_t* selfPublicKey() { return m_selfPublicKey; }
+	void getSharedKeySent(uint8_t* shared_key, const uint8_t* public_key);
+
+
+private:
+	void getSharedKey(Shared_Keys* shared_keys, uint8_t* shared_key, const uint8_t* secret_key, const uint8_t* public_key);
 
 private:
 	std::shared_ptr<Networking_Core> m_net=nullptr;
@@ -168,10 +178,10 @@ private:
 	uint32_t       m_loadedNumNodes=0;
 	unsigned int   m_loadedNodesIndex=0;
 
-	Shared_Keys shared_keys_recv{};
-	Shared_Keys shared_keys_sent{};
+	Shared_Keys m_sharedKeysRecv{};
+	Shared_Keys m_sharedKeysSent{};
 
-	struct PING* m_ping=nullptr;
+	Ping* m_ping=nullptr;
 	Ping_Array    m_dhtPingArray{};
 	Ping_Array    m_dhtHardenPingArray{};
 

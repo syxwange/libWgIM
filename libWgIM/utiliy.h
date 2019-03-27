@@ -28,7 +28,8 @@ uint64_t current_time_monotonic(void);
 void unix_time_update();
 uint64_t unix_time();
 int is_timeout(uint64_t timestamp, uint64_t timeout);
-
+bool id_equal(const uint8_t* dest, const uint8_t* src);
+uint32_t id_copy(uint8_t* dest, const uint8_t* src);
 ///==================================
 uint64_t random_64b(void);
 ///===Ping_Array====start=====================================================
