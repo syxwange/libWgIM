@@ -31,7 +31,7 @@ int Messenger::init()
 		}			
 	}
 	
-	if (m_dht)
+	if (!m_dht)
 		return Messenger::MESSENGER_ERROR_DHT;
 	m_dht->init(m_net);
 	

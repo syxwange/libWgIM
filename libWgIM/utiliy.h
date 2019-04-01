@@ -40,7 +40,7 @@ int ipport_equal(const IP_Port* a, const IP_Port* b);
 int ip_equal(const IP* a, const IP* b);
 int id_closest(const uint8_t* pk, const uint8_t* pk1, const uint8_t* pk2);
 const char* ip_ntoa(const IP* ip);
-
+int ipport_isset(const IP_Port* ipport);
 
 /////===========================LAN
 int LAN_ip(IP ip);

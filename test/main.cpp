@@ -10,26 +10,13 @@
 #include "../libWgIM/utiliy.h"
 int main(int argc, char *argv[])
 {
-	QCoreApplication a(argc, argv);
-	auto i = sodium_init();
-	Messenger m;
-	auto ret = m.init();
-	Utiliy::unixTimeUpdate();	
-	std::cout <<"unixBaseTimeValue:"<< Utiliy::unixBaseTimeValue<<"lastMonotime:"<<Utiliy::lastMonotime<< "unixTimeValue:" << Utiliy::unixTimeValue<< "     "<<Utiliy::currentTimeMonotonic()<<std::endl;
-	Utiliy::unixTimeUpdate();
-	std::cout << "unixBaseTimeValue:" << Utiliy::unixBaseTimeValue << "lastMonotime:" << Utiliy::lastMonotime << "unixTimeValue:" << Utiliy::unixTimeValue << "     " << Utiliy::currentTimeMonotonic() << std::endl;
-	Utiliy::unixTimeUpdate();
-	std::cout << "unixBaseTimeValue:" << Utiliy::unixBaseTimeValue << "lastMonotime:" << Utiliy::lastMonotime << "unixTimeValue:" << Utiliy::unixTimeValue << "     " << Utiliy::currentTimeMonotonic() << std::endl;
-	Utiliy::unixTimeUpdate();
-	std::cout << "unixBaseTimeValue:" << Utiliy::unixBaseTimeValue << "lastMonotime:" << Utiliy::lastMonotime << "unixTimeValue:" << Utiliy::unixTimeValue << "     " << Utiliy::currentTimeMonotonic() << std::endl;
-
-	Sleep(3000);
-	Utiliy::unixTimeUpdate();
-	std::cout << "unixBaseTimeValue:" << Utiliy::unixBaseTimeValue << "lastMonotime:" << Utiliy::lastMonotime << "unixTimeValue:" << Utiliy::unixTimeValue << "     " << Utiliy::currentTimeMonotonic() << std::endl;
-
-	Sleep(30000);
-	Utiliy::unixTimeUpdate();
-	std::cout << "unixBaseTimeValue:" << Utiliy::unixBaseTimeValue << "lastMonotime:" << Utiliy::lastMonotime << "unixTimeValue:" << Utiliy::unixTimeValue << "     " << Utiliy::currentTimeMonotonic() << std::endl;
-
+	QCoreApplication a(argc, argv);	
+	//Messenger m;
+	//m.init();
+	uint32_t i, num = ~0, curr = 0;
+	if (num >time(nullptr))
+	{
+		num = 0;
+	}
 	return a.exec();
 }

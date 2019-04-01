@@ -1,26 +1,29 @@
-
+﻿
 #include <time.h>
 
 #include "utiliy.h"
 #include <sodium.h>
 #include "cryptocore.h"
 
-/* don't call into system billions of times for no reason */
-uint64_t Utiliy::unixTimeValue=0;
-uint64_t Utiliy::unixBaseTimeValue=0;
-uint64_t Utiliy::lastMonotime=0;
+/* don't call into system billions of times for no reason 不要无缘无故地呼叫系统数十亿次*/
+uint64_t Utiliy::unixTimeValue=0;              //1970 年 1 月 1 日(00: 00:00) 到当前和秒数
+uint64_t Utiliy::unixBaseTimeValue=0;       //1970 年 1 月 1 日(00: 00:00) 到电脑开机的秒数
+uint64_t Utiliy::lastMonotime=0;               //电脑开机的毫秒数
 uint64_t Utiliy::addMonotime=0;
 
+//time(nullptr)函数将返回 自 1970 年 1 月 1 日(00: 00:00) 的秒数，
 void Utiliy::unixTimeUpdate()
 {
 	if (unixBaseTimeValue == 0)
 	{		
 		unixBaseTimeValue = (time(nullptr) - (currentTimeMonotonic() / 1000ULL));
 	}		
-	unixTimeValue = (currentTimeMonotonic() / 1000ULL) + unixTimeValue;
+	unixTimeValue = (currentTimeMonotonic() / 1000ULL) + unixBaseTimeValue;
 }
 
-/* return current monotonic time in milliseconds (ms). */
+/* return current monotonic time in milliseconds (ms). 
+ * GetTickCount64()得到自系统启动以来经过的毫秒数。
+*/
 uint64_t Utiliy::currentTimeMonotonic(void)
 {
 	uint64_t time;
@@ -36,14 +39,14 @@ uint64_t Utiliy::currentTimeMonotonic(void)
 }
 
 
-/* don't call into system billions of times for no reason ��Ҫ��Ե�޹ʵغ���ϵͳ��ʮ�ڴ�*/
-static uint64_t unix_time_value;
-static uint64_t unix_base_time_value;
-static uint64_t last_monotime;
+/* don't call into system billions of times for no reason 不要无缘无故地呼叫系统数十亿次*/
+static uint64_t unix_time_value;                      //1970 年 1 月 1 日(00: 00:00) 到当前和秒数
+static uint64_t unix_base_time_value;             //1970 年 1 月 1 日(00: 00:00) 到电脑开机的秒数
+static uint64_t last_monotime;                       //电脑开机的毫秒数
 static uint64_t add_monotime;
 
 
-/* return current monotonic time in milliseconds (ms). ���ص�����������ǰʱ�䣬�Ժ��루ms��Ϊ��λ*/
+/* return current monotonic time in milliseconds (ms). 返回电脑启动到当前时间，以毫秒（ms）为单位*/
 uint64_t current_time_monotonic(void)
 {
 	uint64_t time;
@@ -168,6 +171,17 @@ int ipport_equal(const IP_Port* a, const IP_Port* b)
 }
 
 
+/* checks if ip is valid */
+int ipport_isset(const IP_Port* ipport)
+{
+	if (!ipport)
+		return 0;
+
+	if (!ipport->port)
+		return 0;
+
+	return ip_isset(&ipport->ip);
+}
 
 
 
@@ -180,7 +194,8 @@ int id_closest(const uint8_t* pk, const uint8_t* pk1, const uint8_t* pk2)
 {
 	size_t   i;
 	uint8_t distance1, distance2;
-	for (i = 0; i < crypto_box_PUBLICKEYBYTES; ++i) {
+	for (i = 0; i < crypto_box_PUBLICKEYBYTES; ++i)
+	{
 
 		distance1 = pk[i] ^ pk1[i];
 		distance2 = pk[i] ^ pk2[i];
@@ -196,11 +211,9 @@ int id_closest(const uint8_t* pk, const uint8_t* pk1, const uint8_t* pk2)
 
 
 /* ip_ntoa
- *   converts ip into a string
- *   uses a static buffer, so mustn't used multiple times in the same output
- *
- *   IPv6 addresses are enclosed into square brackets, i.e. "[IPv6]"
- *   writes error message into the buffer on error
+ *   converts ip into a string  uses a static buffer, so mustn't used multiple times in the same output 
+ *   IPv6 addresses are enclosed into square brackets, i.e. "[IPv6]"  writes error message into the buffer on error
+ * 将ip转换为字符串使用静态缓冲区，因此不得在同一输出中多次使用   IPv6地址括在方括号中即“[IPv6]”，在出错时将错误消息写入缓冲区
  */
  /* there would be INET6_ADDRSTRLEN, but it might be too short for the error message */
 static char addresstext[96]; // FIXME magic number. Why not INET6_ADDRSTRLEN ?
@@ -327,16 +340,15 @@ static void clear_entry(Ping_Array* array, uint32_t index)
 {
 	free(array->entries[index].data);
 	array->entries[index].data = NULL;
-	array->entries[index].length =
-		array->entries[index].time =
-		array->entries[index].ping_id = 0;
+	array->entries[index].length = array->entries[index].time =	array->entries[index].ping_id = 0;
 }
 
 /* Clear timed out entries.
  */
 static void ping_array_clear_timedout(Ping_Array* array)
 {
-	while (array->last_deleted != array->last_added) {
+	while (array->last_deleted != array->last_added)
+	{
 		uint32_t index = array->last_deleted % array->total_size;
 
 		if (!is_timeout(array->entries[index].time, array->timeout))
@@ -417,9 +429,8 @@ int ping_array_check(uint8_t * data, uint32_t length, Ping_Array * array, uint64
 }
 
 /* Initialize a Ping_Array.
- * size represents the total size of the array and should be a power of 2.
- * timeout represents the maximum timeout in seconds for the entry.
- *
+ * size represents the total size of the array and should be a power of 2. timeout represents the maximum timeout in seconds for the entry.
+ * 初始化Ping_Array。 size表示阵列的总大小，应该是2的幂.timeout表示条目的最大超时（秒）。
  * return 0 on success.
  * return -1 on failure.
  */
@@ -432,7 +443,6 @@ int ping_array_init(Ping_Array * empty_array, uint32_t size, uint32_t timeout)
 
 	if (empty_array->entries == NULL)
 		return -1;
-
 	empty_array->last_deleted = empty_array->last_added = 0;
 	empty_array->total_size = size;
 	empty_array->timeout = timeout;
@@ -443,12 +453,12 @@ int ping_array_init(Ping_Array * empty_array, uint32_t size, uint32_t timeout)
  */
 void ping_array_free_all(Ping_Array * array)
 {
-	while (array->last_deleted != array->last_added) {
+	while (array->last_deleted != array->last_added) 
+	{
 		uint32_t index = array->last_deleted % array->total_size;
 		clear_entry(array, index);
 		++array->last_deleted;
 	}
-
 	free(array->entries);
 	array->entries = NULL;
 }

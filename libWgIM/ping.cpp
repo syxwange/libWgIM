@@ -16,10 +16,10 @@ static int handle_ping_request(void* _dht, IP_Port source, const uint8_t* packet
 		return 1;
 
 	uint8_t shared_key[crypto_box_BEFORENMBYTES];
+	uint8_t ping_plain[PING_PLAIN_SIZE]; 
 
-	uint8_t ping_plain[PING_PLAIN_SIZE];
 	// Decrypt ping_id
-	ping->getDHT()->getSharedKeyRecv(shared_key, packet + 1);
+	dht->getSharedKeyRecv(shared_key, packet + 1);
 	rc = CryptoCore::decryptDataSymmetric(shared_key,	packet + 1 + crypto_box_PUBLICKEYBYTES,
 		packet + 1 + crypto_box_PUBLICKEYBYTES + crypto_box_NONCEBYTES,		PING_PLAIN_SIZE + crypto_box_MACBYTES,	ping_plain);
 
@@ -105,9 +105,7 @@ int Ping::init(std::shared_ptr<DHT> dht)
 	{		
 		return  1;
 	}	
-
-	std::shared_ptr<int> shared_a(new int (10));
-	auto  p = shared_a.get();	
+		
 	m_dht->getNetwork()->networkingRegisterhandler(NET_PACKET_PING_REQUEST, &handle_ping_request, dht.get());
 	m_dht->getNetwork()->networkingRegisterhandler(NET_PACKET_PING_REQUEST, &handle_ping_response, dht.get());
 	
