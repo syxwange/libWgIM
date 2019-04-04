@@ -152,27 +152,43 @@ public:
 	~DHT();
 
 	int init(std::shared_ptr<Networking_Core> net);	
-	void getSharedKeySent(uint8_t* shared_key, const uint8_t* public_key);
-	void getSharedKeyRecv(uint8_t* shared_key, const uint8_t* public_key);
+	
 	bool nodeAddableToCloseList(const uint8_t* public_key, IP_Port ip_port);
 	int addToClose(const uint8_t* public_key, IP_Port ip_port, bool simulate);
+	int addfriend(const uint8_t* public_key, void (*ip_callback)(void* data, int32_t number, IP_Port), void* data, int32_t number, uint16_t* lock_count);
 	bool addToList(Node_format* nodes_list, unsigned int length, const uint8_t* pk, IP_Port ip_port, const uint8_t* cmp_pk);
 	int addtoLists(IP_Port ip_port, const uint8_t* public_key);
+	int add_to_close(const uint8_t* public_key, IP_Port ip_port, bool simulate);
 	unsigned int bitByBitCmp(const uint8_t* pk1, const uint8_t* pk2);
+	void getSharedKeySent(uint8_t* shared_key, const uint8_t* public_key);
+	void getSharedKeyRecv(uint8_t* shared_key, const uint8_t* public_key);
 	int getfriendip(const uint8_t* public_key, IP_Port* ip_port);
 	int get_close_nodes(const uint8_t* public_key, Node_format* nodes_list, sa_family_t sa_family, uint8_t is_LAN, uint8_t want_good);
+	int getnodes(IP_Port ip_port, const uint8_t* public_key, const uint8_t* client_id, const Node_format* sendback_node);
+	IPPTsPng* get_closelist_IPPTsPng(const uint8_t* public_key, sa_family_t sa_family);
+	uint32_t have_nodes_closelist(Node_format* nodes, uint16_t num);
 	int sendnodes_ipv6(IP_Port ip_port, const uint8_t* public_key, const uint8_t* client_id, const uint8_t* sendback_data, uint16_t length,
 		const uint8_t* shared_encryption_key);
 	uint8_t sent_getnode_to_node(const uint8_t* public_key, IP_Port node_ip_port, uint64_t ping_id, Node_format* sendback_node);
+	int send_NATping(const uint8_t* public_key, uint64_t ping_id, uint8_t type);
 	int send_hardening_getnode_res(const Node_format* sendto, const uint8_t* queried_client_id, const uint8_t* nodes_data, uint16_t nodes_data_length);
-	unsigned int ping_node_from_getnodes_ok(const uint8_t* public_key, IP_Port ip_port);
-	int add_to_close(const uint8_t* public_key, IP_Port ip_port, bool simulate);
+	unsigned int ping_node_from_getnodes_ok(const uint8_t* public_key, IP_Port ip_port);	
 	int returnedip_ports(IP_Port ip_port, const uint8_t* public_key, const uint8_t* nodepublic_key);
+	int route_packet(const uint8_t* public_key, const uint8_t* packet, uint16_t length);
+	int route_tofriend(const uint8_t* friend_id, const uint8_t* packet, uint16_t length);
+	int routeone_tofriend(const uint8_t* friend_id, const uint8_t* packet, uint16_t length);
+	int friend_number(const uint8_t* public_key);
+	int friend_iplist(IP_Port* ip_portlist, uint16_t friend_num);
+	
+	void cryptopacket_registerhandler(uint8_t byte, cryptopacket_handler_callback cb, void* object);
 
 	std::shared_ptr<Networking_Core> getNetwork() { return m_net; }
 	Ping* getPing() { return m_ping; }
 	Client_data* getCloseClientList(){ return m_closeClientlist; }
 	uint8_t* selfPublicKey() { return m_selfPublicKey; }
+	uint8_t* selfSecretKey() { return m_selfSecretKey; }
+	Cryptopacket_Handles* cryptopackethandlers() {	return m_cryptopackethandlers;}
+	DHT_Friend* friendsList() { return m_friendsList; }
 private:
 	void getSharedKey(Shared_Keys* shared_keys, uint8_t* shared_key, const uint8_t* secret_key, const uint8_t* public_key);
 	

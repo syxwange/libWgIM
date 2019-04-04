@@ -31,8 +31,11 @@ public:
 	static int decryptDataSymmetric(const uint8_t* secret_key, const uint8_t* nonce, const uint8_t* encrypted, uint32_t length, uint8_t* plain);
 	static int create_request(const uint8_t* send_public_key, const uint8_t* send_secret_key, uint8_t* packet, const uint8_t* recv_public_key,
 		const uint8_t* data, uint32_t length, uint8_t request_id);
-
+	static int handle_request(const uint8_t* self_public_key, const uint8_t* self_secret_key, uint8_t* public_key, uint8_t* data,
+		uint8_t* request_id, const uint8_t* packet, uint16_t length);
+	static void new_symmetric_key(uint8_t* key);
 	static int encrypt_data(const uint8_t* public_key, const uint8_t* secret_key, const uint8_t* nonce, const uint8_t* plain, uint32_t length, uint8_t* encrypted);
+	static int decrypt_data(const uint8_t* public_key, const uint8_t* secret_key, const uint8_t* nonce, const uint8_t* encrypted, uint32_t length, uint8_t* plain);
 private:
 	static void CryptoCore::randomNonce(uint8_t* nonce);
 };

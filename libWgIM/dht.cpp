@@ -17,6 +17,17 @@
 #define CHECK_TYPE_TEST_RES 5
 
 
+#define MAX_NORMAL_PUNCHING_TRIES 5
+
+#define NAT_PING_REQUEST    0
+#define NAT_PING_RESPONSE   1
+
+/* Number of get node requests to send to quickly find close nodes. */
+#define MAX_BOOTSTRAP_TIMES 5
+
+#define HARDENING_INTERVAL 120
+#define HARDEN_TIMEOUT 1200
+
 /* return 0 if not.
  * return 1 if route request are ok
  * return 2 if it responds to send node packets correctly
@@ -625,8 +636,7 @@ static int handle_sendnodes_ipv6(void* object, IP_Port source, const uint8_t* pa
 	return 0;
 }
 
-static bool is_pk_in_client_list(Client_data* list, unsigned int client_list_length, const uint8_t* public_key,
-	IP_Port ip_port)
+static bool is_pk_in_client_list(Client_data* list, unsigned int client_list_length, const uint8_t* public_key,	IP_Port ip_port)
 {
 	unsigned int i;
 
@@ -640,6 +650,139 @@ static bool is_pk_in_client_list(Client_data* list, unsigned int client_list_len
 	}
 
 	return 0;
+}
+
+static int cryptopacket_handle(void* object, IP_Port source, const uint8_t* packet, uint16_t length)
+{
+	DHT* dht = (DHT*)object;
+
+	if (packet[0] == NET_PACKET_CRYPTO) {
+		if (length <= crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES + 1 + crypto_box_MACBYTES ||
+			length > MAX_CRYPTO_REQUEST_SIZE + crypto_box_MACBYTES)
+			return 1;
+
+		if ( CryptoCore::publicKeyCmp(packet + 1, dht->selfPublicKey()) == 0) { // Check if request is for us.
+			uint8_t public_key[crypto_box_PUBLICKEYBYTES];
+			uint8_t data[MAX_CRYPTO_REQUEST_SIZE];
+			uint8_t number;
+			int len =CryptoCore::handle_request(dht->selfPublicKey(), dht->selfSecretKey(), public_key, data, &number, packet, length);
+
+			if (len == -1 || len == 0)
+				return 1;
+
+			if (!dht->cryptopackethandlers()[number].function)  return 1;
+
+			return dht->cryptopackethandlers()[number].function(dht->cryptopackethandlers()[number].object, source, public_key,	data, len);
+		}
+		else { /* If request is not for us, try routing it. */
+			int retval = dht->route_packet(packet + 1, packet, length);
+
+			if ((unsigned int)retval == length)
+				return 0;
+		}
+	}
+	return 1;
+}
+
+
+/* Handle a received ping request for. 处理收到的ping请求*/
+static int handle_NATping(void* object, IP_Port source, const uint8_t* source_pubkey, const uint8_t* packet,	uint16_t length)
+{
+	if (length != sizeof(uint64_t) + 1)
+		return 1;
+
+	DHT * dht = (DHT*)object;
+	uint64_t ping_id;
+	memcpy(&ping_id, packet + 1, sizeof(uint64_t));
+
+	int friendnumber = dht->friend_number(source_pubkey);
+
+	if (friendnumber == -1)
+		return 1;
+
+	DHT_Friend * friend1 = & dht->friendsList()[friendnumber];
+
+	if (packet[0] == NAT_PING_REQUEST) {
+		/* 1 is reply */
+		dht->send_NATping( source_pubkey, ping_id, NAT_PING_RESPONSE);
+		friend1->nat.recvNATping_timestamp = unix_time();
+		return 0;
+	}
+	else if (packet[0] == NAT_PING_RESPONSE) {
+		if (friend1->nat.NATping_id == ping_id) {
+			friend1->nat.NATping_id = random_64b();
+			friend1->nat.hole_punching = 1;
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
+
+/* Handle a received hardening packet 处理收到的加固数据包*/
+static int handle_hardening(void* object, IP_Port source, const uint8_t* source_pubkey, const uint8_t* packet,	uint16_t length)
+{
+	DHT* dht =(DHT*) object;
+
+	if (length < 2) {
+		return 1;
+	}
+
+	switch (packet[0]) {
+	case CHECK_TYPE_GETNODE_REQ: {
+		if (length != HARDREQ_DATA_SIZE)
+			return 1;
+
+		Node_format node, tocheck_node;
+		node.ip_port = source;
+		memcpy(node.public_key, source_pubkey, crypto_box_PUBLICKEYBYTES);
+		memcpy(&tocheck_node, packet + 1, sizeof(Node_format));
+
+		if (dht->getnodes(tocheck_node.ip_port, tocheck_node.public_key, packet + 1 + sizeof(Node_format), &node) == -1)
+			return 1;
+
+		return 0;
+	}
+
+	case CHECK_TYPE_GETNODE_RES: {
+		if (length <= crypto_box_PUBLICKEYBYTES + 1)
+			return 1;
+
+		if (length > 1 + crypto_box_PUBLICKEYBYTES + sizeof(Node_format) * MAX_SENT_NODES)
+			return 1;
+
+		uint16_t length_nodes = length - 1 - crypto_box_PUBLICKEYBYTES;
+		Node_format nodes[MAX_SENT_NODES];
+		int num_nodes = unpack_nodes(nodes, MAX_SENT_NODES, 0, packet + 1 + crypto_box_PUBLICKEYBYTES, length_nodes, 0);
+
+		/* TODO: MAX_SENT_NODES nodes should be returned at all times
+		 (right now we have a small network size so it could cause problems for testing and etc..) */
+		if (num_nodes <= 0)
+			return 1;
+
+		/* NOTE: This should work for now but should be changed to something better. */
+		if (dht->have_nodes_closelist(nodes, num_nodes) < (uint32_t)((num_nodes + 2) / 2))
+			return 1;
+
+		IPPTsPng * temp = dht->get_closelist_IPPTsPng(packet + 1, nodes[0].ip_port.ip.family);
+
+		if (temp == NULL)
+			return 1;
+
+		if (is_timeout(temp->hardening.send_nodes_timestamp, HARDENING_INTERVAL))
+			return 1;
+
+		if (CryptoCore::publicKeyCmp(temp->hardening.send_nodes_pingedid, source_pubkey) != 0)
+			return 1;
+
+		/* If Nodes look good and the request checks out */
+		temp->hardening.send_nodes_ok = 1;
+		return 0;/* success*/
+	}
+	}
+
+	return 1;
 }
 
 
@@ -662,10 +805,26 @@ int DHT::init(std::shared_ptr<Networking_Core> net)
 	
 	m_net->networkingRegisterhandler(NET_PACKET_GET_NODES, &handle_getnodes, this);
 	m_net->networkingRegisterhandler(NET_PACKET_SEND_NODES_IPV6, &handle_sendnodes_ipv6, this);
-	/*m_net->networkingRegisterhandler(NET_PACKET_CRYPTO, &cryptopacket_handle, this);
-	m_net->networkingRegisterhandler(CRYPTO_PACKET_NAT_PING, &handle_NATping, this);
-	m_net->networkingRegisterhandler(CRYPTO_PACKET_HARDENING, &handle_hardening, this);*/
+	m_net->networkingRegisterhandler(NET_PACKET_CRYPTO, &cryptopacket_handle, this);
+	cryptopacket_registerhandler(CRYPTO_PACKET_NAT_PING, &handle_NATping, this);
+	cryptopacket_registerhandler(CRYPTO_PACKET_HARDENING, &handle_hardening, this);
 
+	CryptoCore::new_symmetric_key(m_secretSymmetric_key);
+	crypto_box_keypair(m_selfPublicKey,m_selfSecretKey);
+
+	ping_array_init(&m_dhtPingArray, DHT_PING_ARRAY_SIZE, PING_TIMEOUT);
+	ping_array_init(&m_dhtHardenPingArray, DHT_PING_ARRAY_SIZE, PING_TIMEOUT);
+	
+	for (uint32_t i = 0; i < DHT_FAKE_FRIEND_NUMBER; ++i)
+	{
+		uint8_t random_key_bytes[crypto_box_PUBLICKEYBYTES];
+		randombytes(random_key_bytes, sizeof(random_key_bytes));
+
+		if (addfriend(random_key_bytes, 0, 0, 0, 0) != 0)
+		{			
+			return 1;
+		}
+	}
 	return 0;
 }
 
@@ -1325,5 +1484,418 @@ bool DHT::nodeAddableToCloseList( const uint8_t* public_key, IP_Port ip_port)
 	   }
 
 #endif
+	   return 0;
+   }
+
+
+
+
+   /* Send the given packet to node with public_key
+	*使用public_key将给定数据包发送到节点
+	*  return -1 if failure.*/
+   int DHT::route_packet(const uint8_t* public_key, const uint8_t* packet, uint16_t length)
+   {
+	   uint32_t i;
+
+	   for (i = 0; i < LCLIENT_LIST; ++i) {
+		   if (id_equal(public_key, m_closeClientlist[i].public_key)) {
+			   const Client_data* client = &m_closeClientlist[i];
+
+			   if (ip_isset(&client->assoc6.ip_port.ip))
+				   return  m_net->sendpacket(client->assoc6.ip_port, packet, length);
+			   else if (ip_isset(&client->assoc4.ip_port.ip))
+				   return m_net->sendpacket(client->assoc4.ip_port, packet, length);
+			   else
+				   break;
+		   }
+	   }
+	   return -1;
+   }
+
+
+   /*  return friend number from the public_key.
+ *  return -1 if a failure occurs.
+ */
+   int DHT::friend_number(const uint8_t* public_key)
+   {
+	   uint32_t i;
+
+	   for (i = 0; i < m_numFriends; ++i) {
+		   if (id_equal(m_friendsList[i].public_key, public_key))
+			   return i;
+	   }
+	   return -1;
+   }
+
+
+   int DHT::send_NATping(const uint8_t* public_key, uint64_t ping_id, uint8_t type)
+   {
+	   uint8_t data[sizeof(uint64_t) + 1];
+	   uint8_t packet[MAX_CRYPTO_REQUEST_SIZE];
+
+	   int num = 0;
+
+	   data[0] = type;
+	   memcpy(data + 1, &ping_id, sizeof(uint64_t));
+	   /* 254 is NAT ping request packet id */
+	   int len =CryptoCore::create_request (m_selfPublicKey, m_selfSecretKey, packet, public_key, data, sizeof(uint64_t) + 1, CRYPTO_PACKET_NAT_PING);
+
+	   if (len == -1)
+		   return -1;
+
+	   if (type == 0) /* If packet is request use many people to route it. */
+		   num = route_tofriend(public_key, packet, len);
+	   else if (type == 1) /* If packet is response use only one person to route it */
+		   num = routeone_tofriend(public_key, packet, len);
+
+	   if (num == 0)
+		   return -1;
+
+	   return num;
+   }
+
+
+
+   /* Send the following packet to everyone who tells us they are connected to friend_id.
+	*将以下数据包发送给告诉我们他们已连接到friend_id的所有人。
+	*  return ip for friend.
+	*  return number of nodes the packet was sent to. (Only works if more than (MAX_FRIEND_CLIENTS / 4).
+	*/
+   int DHT::route_tofriend(const uint8_t* friend_id, const uint8_t* packet, uint16_t length)
+   {
+	   int num = friend_number(friend_id);
+
+	   if (num == -1)
+		   return 0;
+
+	   uint32_t i, sent = 0;
+	   uint8_t friend_sent[MAX_FRIEND_CLIENTS] = { 0 };
+
+	   IP_Port ip_list[MAX_FRIEND_CLIENTS];
+	   int ip_num = friend_iplist(ip_list, num);
+
+	   if (ip_num < (MAX_FRIEND_CLIENTS / 4))
+		   return 0; /* Reason for that? */
+
+	   DHT_Friend * friend1 = &m_friendsList[num];
+	   Client_data * client;
+
+	   /* extra legwork, because having the outside allocating the space for us
+		* is *usually* good(tm) (bites us in the behind in this case though) */
+	   uint32_t a;
+
+	   for (a = 0; a < 2; a++)
+		   for (i = 0; i < MAX_FRIEND_CLIENTS; ++i) {
+			   if (friend_sent[i])/* Send one packet per client.*/
+				   continue;
+
+			   client = &friend1->client_list[i];
+			   IPPTsPng* assoc = NULL;
+
+			   if (!a)
+				   assoc = &client->assoc4;
+			   else
+				   assoc = &client->assoc6;
+
+			   /* If ip is not zero and node is good. */
+			   if (ip_isset(&assoc->ret_ip_port.ip) &&
+				   !is_timeout(assoc->ret_timestamp, BAD_NODE_TIMEOUT)) {
+				   int retval =m_net->sendpacket(assoc->ip_port, packet, length);
+
+				   if ((unsigned int)retval == length) {
+					   ++sent;
+					   friend_sent[i] = 1;
+				   }
+			   }
+		   }
+
+	   return sent;
+   }
+
+   /* Puts all the different ips returned by the nodes for a friend_num into array ip_portlist.
+ * ip_portlist must be at least MAX_FRIEND_CLIENTS big.
+ *将friend_num的节点返回的所有不同ips放入array ip_portlist。 ip_portlist必须至少MAX_FRIEND_CLIENTS很大。
+ *  return the number of ips returned.
+ *  return 0 if we are connected to friend or if no ips were found.
+ *  return -1 if no such friend.
+ */
+   int DHT::friend_iplist(IP_Port* ip_portlist, uint16_t friend_num)
+   {
+	   if (friend_num >=m_numFriends)
+		   return -1;
+
+	   DHT_Friend * friend1= &m_friendsList[friend_num];
+	   Client_data * client;
+	   IP_Port ipv4s[MAX_FRIEND_CLIENTS];
+	   int num_ipv4s = 0;
+	   IP_Port ipv6s[MAX_FRIEND_CLIENTS];
+	   int num_ipv6s = 0;
+	   int i;
+
+	   for (i = 0; i < MAX_FRIEND_CLIENTS; ++i) {
+		   client = &(friend1->client_list[i]);
+
+		   /* If ip is not zero and node is good. */
+		   if (ip_isset(&client->assoc4.ret_ip_port.ip) && !is_timeout(client->assoc4.ret_timestamp, BAD_NODE_TIMEOUT)) {
+			   ipv4s[num_ipv4s] = client->assoc4.ret_ip_port;
+			   ++num_ipv4s;
+		   }
+
+		   if (ip_isset(&client->assoc6.ret_ip_port.ip) && !is_timeout(client->assoc6.ret_timestamp, BAD_NODE_TIMEOUT)) {
+			   ipv6s[num_ipv6s] = client->assoc6.ret_ip_port;
+			   ++num_ipv6s;
+		   }
+
+		   if (id_equal(client->public_key, friend1->public_key))
+			   if (!is_timeout(client->assoc6.timestamp, BAD_NODE_TIMEOUT) || !is_timeout(client->assoc4.timestamp, BAD_NODE_TIMEOUT))
+				   return 0; /* direct connectivity */
+	   }
+
+#ifdef FRIEND_IPLIST_PAD
+	   memcpy(ip_portlist, ipv6s, num_ipv6s * sizeof(IP_Port));
+
+	   if (num_ipv6s == MAX_FRIEND_CLIENTS)
+		   return MAX_FRIEND_CLIENTS;
+
+	   int num_ipv4s_used = MAX_FRIEND_CLIENTS - num_ipv6s;
+
+	   if (num_ipv4s_used > num_ipv4s)
+		   num_ipv4s_used = num_ipv4s;
+
+	   memcpy(&ip_portlist[num_ipv6s], ipv4s, num_ipv4s_used * sizeof(IP_Port));
+	   return num_ipv6s + num_ipv4s_used;
+
+#else /* !FRIEND_IPLIST_PAD */
+
+	   /* there must be some secret reason why we can't pad the longer list
+		* with the shorter one...
+		*/
+	   if (num_ipv6s >= num_ipv4s) {
+		   memcpy(ip_portlist, ipv6s, num_ipv6s * sizeof(IP_Port));
+		   return num_ipv6s;
+	   }
+
+	   memcpy(ip_portlist, ipv4s, num_ipv4s * sizeof(IP_Port));
+	   return num_ipv4s;
+
+#endif /* !FRIEND_IPLIST_PAD */
+   }
+
+   /* Send the following packet to one random person who tells us they are connected to friend_id.
+ *将以下数据包发送给一个告诉我们他们已连接到friend_id的随机人员。
+ *  return number of nodes the packet was sent to.
+ */
+   int DHT::routeone_tofriend(const uint8_t* friend_id, const uint8_t* packet, uint16_t length)
+   {
+	   int num = friend_number(friend_id);
+
+	   if (num == -1)
+		   return 0;
+
+	   DHT_Friend * friend1 = &m_friendsList[num];
+	   Client_data * client;
+
+	   IP_Port ip_list[MAX_FRIEND_CLIENTS * 2];
+	   int n = 0;
+	   uint32_t i;
+
+	   /* extra legwork, because having the outside allocating the space for us
+		* is *usually* good(tm) (bites us in the behind in this case though) */
+	   uint32_t a;
+
+	   for (a = 0; a < 2; a++)
+		   for (i = 0; i < MAX_FRIEND_CLIENTS; ++i) {
+			   client = &friend1->client_list[i];
+			   IPPTsPng* assoc = NULL;
+
+			   if (!a)
+				   assoc = &client->assoc4;
+			   else
+				   assoc = &client->assoc6;
+
+			   /* If ip is not zero and node is good. */
+			   if (ip_isset(&assoc->ret_ip_port.ip) && !is_timeout(assoc->ret_timestamp, BAD_NODE_TIMEOUT)) {
+				   ip_list[n] = assoc->ip_port;
+				   ++n;
+			   }
+		   }
+
+	   if (n < 1)
+		   return 0;
+
+	   int retval = m_net->sendpacket(ip_list[rand() % n], packet, length);
+
+	   if ((unsigned int)retval == length)
+		   return 1;
+
+	   return 0;
+   }
+
+
+   void DHT::cryptopacket_registerhandler(uint8_t byte, cryptopacket_handler_callback cb, void* object)
+   {
+	   m_cryptopackethandlers[byte].function = cb;
+	   m_cryptopackethandlers[byte].object = object;
+   }
+
+
+   /* Send a getnodes request.发送getnodes请求。sendback_node是它将响应发送回的节点（设置为NULL以禁用此功能）
+   sendback_node is the node that it will send back the response to (set to NULL to disable this) */
+   int DHT::getnodes(IP_Port ip_port, const uint8_t* public_key, const uint8_t* client_id,   const Node_format* sendback_node)
+   {
+	   /* Check if packet is going to be sent to ourself. */
+	   if (id_equal(public_key,m_selfPublicKey))
+		   return -1;
+
+	   uint8_t plain_message[sizeof(Node_format) * 2] = { 0 };
+
+	   Node_format receiver;
+	   memcpy(receiver.public_key, public_key, crypto_box_PUBLICKEYBYTES);
+	   receiver.ip_port = ip_port;
+	   memcpy(plain_message, &receiver, sizeof(receiver));
+
+	   uint64_t ping_id = 0;
+
+	   if (sendback_node != NULL) {
+		   memcpy(plain_message + sizeof(receiver), sendback_node, sizeof(Node_format));
+		   ping_id = ping_array_add(&m_dhtHardenPingArray, plain_message, sizeof(plain_message));
+	   }
+	   else {
+		   ping_id = ping_array_add(&m_dhtPingArray, plain_message, sizeof(receiver));
+	   }
+
+	   if (ping_id == 0)
+		   return -1;
+
+	   uint8_t plain[crypto_box_PUBLICKEYBYTES + sizeof(ping_id)];
+	   uint8_t encrypt[sizeof(plain) + crypto_box_MACBYTES];
+	   uint8_t data[1 + crypto_box_PUBLICKEYBYTES + crypto_box_NONCEBYTES + sizeof(encrypt)];
+
+	   memcpy(plain, client_id, crypto_box_PUBLICKEYBYTES);
+	   memcpy(plain + crypto_box_PUBLICKEYBYTES, &ping_id, sizeof(ping_id));
+
+	   uint8_t shared_key[crypto_box_BEFORENMBYTES];
+	   getSharedKeySent(shared_key, public_key);
+
+	   uint8_t nonce[crypto_box_NONCEBYTES];
+	  CryptoCore::newNonce(nonce);
+
+	   int len =  CryptoCore::encryptDataSymmetric(shared_key, nonce,  plain,  sizeof(plain),   encrypt);
+
+	   if (len != sizeof(encrypt))
+		   return -1;
+
+	   data[0] = NET_PACKET_GET_NODES;
+	   memcpy(data + 1, m_selfPublicKey, crypto_box_PUBLICKEYBYTES);
+	   memcpy(data + 1 + crypto_box_PUBLICKEYBYTES, nonce, crypto_box_NONCEBYTES);
+	   memcpy(data + 1 + crypto_box_PUBLICKEYBYTES + crypto_box_NONCEBYTES, encrypt, len);
+
+	   return  m_net->sendpacket( ip_port, data, sizeof(data));
+   }
+
+
+   /*
+ * check how many nodes in nodes are also present in the closelist.检查关闭列表中是否还存在节点中的节点数。
+ * TODO: make this function better.
+ */
+   uint32_t DHT::have_nodes_closelist(Node_format* nodes, uint16_t num)
+   {
+	   uint32_t counter = 0;
+	   uint32_t i;
+
+	   for (i = 0; i < num; ++i) {
+		   if (id_equal(nodes[i].public_key,m_selfPublicKey )) {
+			   ++counter;
+			   continue;
+		   }
+
+		   IPPTsPng* temp = get_closelist_IPPTsPng(nodes[i].public_key, nodes[i].ip_port.ip.family);
+
+		   if (temp) {
+			   if (!is_timeout(temp->timestamp, BAD_NODE_TIMEOUT)) {
+				   ++counter;
+			   }
+		   }
+	   }
+
+	   return counter;
+   }
+
+
+   /* TODO: improve */
+   IPPTsPng* DHT::get_closelist_IPPTsPng(const uint8_t* public_key, sa_family_t sa_family)
+   {
+	   uint32_t i;
+
+	   for (i = 0; i < LCLIENT_LIST; ++i) {
+		   if (  CryptoCore::publicKeyCmp( m_closeClientlist[i].public_key, public_key) != 0)
+			   continue;
+
+		   if (sa_family == AF_INET)
+			   return &m_closeClientlist[i].assoc4;
+		   else if (sa_family == AF_INET6)
+			   return &m_closeClientlist[i].assoc6;
+	   }
+	   return NULL;
+   }
+
+
+
+   /* Add a new friend to the friends list.	* public_key must be crypto_box_PUBLICKEYBYTES bytes long.
+	* ip_callback is the callback of a function that will be called when the ip address	* is found along with arguments data and number.
+	* lock_count will be set to a non zero number that must be passed to DHT_delfriend()	* to properly remove the callback.
+	*将新朋友添加到朋友列表中。 public_key必须是crypto_box_PUBLICKEYBYTES个字节。 ip_callback是一个函数的回调，
+	当找到ip地址以及参数data和number时	，将调用该函数。 ock_count将设置为非零数字，必须传递给DHT_delfriend（）才能正确删除回调。
+	*  return 0 if success.
+	*  return -1 if failure (friends list is full).
+	*/
+   int DHT::addfriend(const uint8_t* public_key, void (*ip_callback)(void* data, int32_t number, IP_Port), void* data, int32_t number, uint16_t* lock_count)
+   {
+	   int friend_num = friend_number(public_key);
+
+	   uint16_t lock_num;
+
+	   if (friend_num != -1) { /* Is friend already in DHT? */
+		   DHT_Friend* friend1 = &m_friendsList[friend_num];
+
+		   if (friend1->lock_count == DHT_FRIEND_MAX_LOCKS)
+			   return -1;
+
+		   lock_num = friend1->lock_count;
+		   ++friend1->lock_count;
+		   friend1->callbacks[lock_num].ip_callback = ip_callback;
+		   friend1->callbacks[lock_num].data = data;
+		   friend1->callbacks[lock_num].number = number;
+
+		   if (lock_count)
+			   * lock_count = lock_num + 1;
+
+		   return 0;
+	   }
+
+	   DHT_Friend* temp;
+	   temp = (DHT_Friend*)realloc(m_friendsList, sizeof(DHT_Friend) * (m_numFriends + 1));
+
+	   if (temp == NULL)
+		   return -1;
+
+	   m_friendsList = temp;
+	   DHT_Friend * friend1 = &m_friendsList[m_numFriends];
+	   memset(friend1, 0, sizeof(DHT_Friend));
+	   memcpy(friend1->public_key, public_key, crypto_box_PUBLICKEYBYTES);
+
+	   friend1->nat.NATping_id = random_64b();
+	   ++m_numFriends;
+
+	   lock_num = friend1->lock_count;
+	   ++friend1->lock_count;
+	   friend1->callbacks[lock_num].ip_callback = ip_callback;
+	   friend1->callbacks[lock_num].data = data;
+	   friend1->callbacks[lock_num].number = number;
+
+	   if (lock_count)
+		   * lock_count = lock_num + 1;
+
+	   friend1->num_to_bootstrap = get_close_nodes(friend1->public_key, friend1->to_bootstrap, 0, 1, 0);
 	   return 0;
    }
