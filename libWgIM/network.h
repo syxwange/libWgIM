@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include <QObject>
-
+#include "libwgim_global.h"
 
 #include <winsock2.h>
 #include <windows.h>
@@ -65,6 +65,9 @@
 #define TOX_ADDR_RESOLVE_INET  1
 #define TOX_ADDR_RESOLVE_INET6 2
 
+#define IPV6_IPV4_IN_V6(a) ((a.uint64[0] == 0) && (a.uint32[2] == htonl (0xffff)))
+
+
 
 typedef unsigned int sock_t;
 /* sa_family_t is the sockaddr_in / sockaddr_in6 family field */
@@ -111,7 +114,7 @@ typedef struct {
 	void* object;
 } Packet_Handles;
 
-class Networking_Core : public QObject
+class   Networking_Core : public QObject
 {
 	Q_OBJECT
 
@@ -128,8 +131,8 @@ public:
 	int sendpacket(IP_Port ip_port, const uint8_t* data, uint16_t length);
 	void networkingRegisterhandler(uint8_t byte, packet_handler_callback cb, void* object);
 
-private:
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
 	Packet_Handles m_packethandlers[256]{};
 	sa_family_t m_family=0;
 	uint16_t m_port=0;
@@ -144,11 +147,36 @@ private:
 
 
 
-class NetWork : public QObject
+class  LIBWGIM_EXPORT NetWork : public QObject
 {
 	Q_OBJECT
 
 public:
 	NetWork(QObject *parent);
 	~NetWork();
+	int init(const IP& ip, uint16_t port_from, uint16_t port_to);	
+
+	//调用WSAStartup（）如调用所请求的Socket库，并初始化libsodium库 ，成功m_startupRan=1
+	int networkStartup();
+	//设置socket是IPv4 + IPv6双模式
+	int setSocketDualstack(sock_t sock);
+	static uint64_t currentTimeActual(void);
+	int sendpacket(IP_Port ip_port, const uint8_t* data, uint16_t length);
+	void networkingRegisterhandler(uint8_t byte, packet_handler_callback cb, void* object);
+
+////////////////////////////////////////////////////////////////////////////////////
+
+	Packet_Handles m_packethandlers[256]{};
+	sa_family_t m_family = 0;
+	uint16_t m_port = 0;
+	/* Our UDP socket. */
+	sock_t m_sock = 0;
+	unsigned int  m_error = 0;
+
+	//调用WSAStartup（）如调用所请求的Socket库，并初始化libsodium库 ，成功m_startupRan=1
+	uint8_t m_startupRan = 0;
 };
+
+void kill_sock(sock_t sock);
+
+int addr_parse_ip(const char* address, IP* to);

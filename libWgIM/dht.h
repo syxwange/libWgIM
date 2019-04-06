@@ -189,12 +189,12 @@ public:
 	uint8_t* selfSecretKey() { return m_selfSecretKey; }
 	Cryptopacket_Handles* cryptopackethandlers() {	return m_cryptopackethandlers;}
 	DHT_Friend* friendsList() { return m_friendsList; }
-private:
+
 	void getSharedKey(Shared_Keys* shared_keys, uint8_t* shared_key, const uint8_t* secret_key, const uint8_t* public_key);
 	
 	int get_somewhat_close_nodes(const uint8_t* public_key, Node_format* nodes_list, sa_family_t sa_family, uint8_t is_LAN, uint8_t want_good);
 
-private:
+/////////////////////////////////////////////////////////
 	std::shared_ptr<Networking_Core> m_net=nullptr;
 	Client_data    m_closeClientlist[LCLIENT_LIST]{};
 	uint64_t       m_closeLastgetnodes=0;
@@ -227,3 +227,26 @@ private:
 	Node_format m_toBootstrap[MAX_CLOSE_TO_BOOTSTRAP_NODES]{};
 	unsigned int m_numToBootstrap=0;
 };
+
+
+void to_net_family(IP* ip);
+
+int to_host_family(IP* ip);
+
+void get_shared_key(Shared_Keys* shared_keys, uint8_t* shared_key, const uint8_t* secret_key, const uint8_t* public_key);
+
+void DHT_bootstrap(DHT* dht, IP_Port ip_port, const uint8_t* public_key);
+
+int pack_nodes(uint8_t* data, uint16_t length, const Node_format* nodes, uint16_t number);
+
+int DHT_isconnected(const DHT* dht);
+
+int DHT_non_lan_connected(const DHT* dht);
+
+int unpack_nodes(Node_format* nodes, uint16_t max_num_nodes, uint16_t* processed_data_len, const uint8_t* data, uint16_t length, uint8_t tcp_enabled);
+
+uint16_t closelist_nodes(DHT* dht, Node_format* nodes, uint16_t max_num);
+
+uint16_t list_nodes(Client_data* list, unsigned int length, Node_format* nodes, uint16_t max_num);
+
+uint16_t randfriends_nodes(DHT* dht, Node_format* nodes, uint16_t max_num);

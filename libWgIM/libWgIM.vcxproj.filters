@@ -50,6 +50,24 @@
     <ClCompile Include="ping.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="net_crypto.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tcp_connections.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="onion.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="onion_announce.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lan_discovery.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="onion_client.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="libwgim.h">
@@ -59,6 +77,18 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ping.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="onion.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lan_discovery.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="onion_announce.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="onion_client.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -81,6 +111,12 @@
       <Filter>Header Files</Filter>
     </QtMoc>
     <QtMoc Include="cryptocore.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="net_crypto.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="tcp_connections.h">
       <Filter>Header Files</Filter>
     </QtMoc>
   </ItemGroup>

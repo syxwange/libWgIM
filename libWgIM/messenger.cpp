@@ -30,10 +30,17 @@ int Messenger::init()
 			return Messenger::MESSENGER_ERROR_PORT;
 		}			
 	}
-	
-	if (!m_dht)
+	//初始化m_dht,并添加两个fake朋友
+	if (m_dht->init(m_net))
 		return Messenger::MESSENGER_ERROR_DHT;
-	m_dht->init(m_net);
-	
+
+	if (m_net_crypto->init(m_dht, &m_messengerOption.proxy_info))
+		return Messenger::MESSENGER_ERROR_TCP_SERVER;	
+
+
+	onion = new_onion(m_dht.get());
+	onion_a = new_onion_announce(m_dht.get());
+	onion_c = new_onion_client(m_net_crypto);
+	//fr_c = new_friend_connections(m_onion_c);
 	return 0;
 }

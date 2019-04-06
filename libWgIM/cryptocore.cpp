@@ -217,8 +217,61 @@ int CryptoCore::handle_request(const uint8_t* self_public_key, const uint8_t* se
 }
 
 
-/* Fill a key crypto_box_KEYBYTES big with random bytes */
+/* Fill a key crypto_box_KEYBYTES big with random bytes 用随机字节填充密钥crypto_box_KEYBYTES big*/
 void CryptoCore::new_symmetric_key(uint8_t* key)
 {
 	randombytes(key, crypto_box_KEYBYTES);
+}
+
+
+/* Increment the given nonce by 1. */
+void increment_nonce(uint8_t* nonce)
+{
+	/* FIXME use increment_nonce_number(nonce, 1) or sodium_increment (change to little endian)
+	 * NOTE don't use breaks inside this loop
+	 * In particular, make sure, as far as possible,
+	 * that loop bounds and their potential underflow or overflow
+	 * are independent of user-controlled input (you may have heard of the Heartbleed bug).
+	 */
+	uint32_t i = crypto_box_NONCEBYTES;
+	uint_fast16_t carry = 1U;
+
+	for (; i != 0; --i) {
+		carry += (uint_fast16_t)nonce[i - 1];
+		nonce[i - 1] = (uint8_t)carry;
+		carry >>= 8;
+	}
+}
+
+/* increment the given nonce by num */
+void increment_nonce_number(uint8_t* nonce, uint32_t host_order_num)
+{
+	/* NOTE don't use breaks inside this loop
+	 * In particular, make sure, as far as possible,
+	 * that loop bounds and their potential underflow or overflow
+	 * are independent of user-controlled input (you may have heard of the Heartbleed bug).
+	 */
+	const uint32_t big_endian_num = htonl(host_order_num);
+	const uint8_t* const num_vec = (const uint8_t*)& big_endian_num;
+	uint8_t num_as_nonce[crypto_box_NONCEBYTES] = { 0 };
+	num_as_nonce[crypto_box_NONCEBYTES - 4] = num_vec[0];
+	num_as_nonce[crypto_box_NONCEBYTES - 3] = num_vec[1];
+	num_as_nonce[crypto_box_NONCEBYTES - 2] = num_vec[2];
+	num_as_nonce[crypto_box_NONCEBYTES - 1] = num_vec[3];
+
+	uint32_t i = crypto_box_NONCEBYTES;
+	uint_fast16_t carry = 0U;
+
+	for (; i != 0; --i) {
+		carry += (uint_fast16_t)nonce[i - 1] + (uint_fast16_t)num_as_nonce[i - 1];
+		nonce[i - 1] = (unsigned char)carry;
+		carry >>= 8;
+	}
+}
+
+
+/* Fill the given nonce with random bytes. */
+void random_nonce(uint8_t* nonce)
+{
+	randombytes(nonce, crypto_box_NONCEBYTES);
 }

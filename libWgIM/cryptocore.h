@@ -16,6 +16,8 @@
 #define CRYPTO_PACKET_DHTPK         156
 #define CRYPTO_PACKET_NAT_PING      254 /* NAT ping crypto packet ID. */
 
+
+
 class CryptoCore : public QObject
 {
 	Q_OBJECT
@@ -39,3 +41,10 @@ public:
 private:
 	static void CryptoCore::randomNonce(uint8_t* nonce);
 };
+
+
+void increment_nonce(uint8_t* nonce);
+
+void increment_nonce_number(uint8_t* nonce, uint32_t host_order_num);
+
+void random_nonce(uint8_t* nonce);

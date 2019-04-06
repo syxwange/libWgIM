@@ -82,6 +82,81 @@ static int cmp_dht_entry(const void* a, const void* b)
 }
 
 
+void to_net_family(IP* ip)
+{
+	if (ip->family == AF_INET)
+		ip->family = TOX_AF_INET;
+	else if (ip->family == AF_INET6)
+		ip->family = TOX_AF_INET6;
+}
+
+int to_host_family(IP* ip)
+{
+	if (ip->family == TOX_AF_INET) {
+		ip->family = AF_INET;
+		return 0;
+	}
+	else if (ip->family == TOX_AF_INET6) {
+		ip->family = AF_INET6;
+		return 0;
+	}
+	else {
+		return -1;
+	}
+}
+
+/* Shared key generations are costly, it is therefor smart to store commonly used
+ * ones so that they can re used later without being computed again.
+ *
+ * If shared key is already in shared_keys, copy it to shared_key.
+ * else generate it into shared_key and copy it to shared_keys
+ */
+void get_shared_key(Shared_Keys* shared_keys, uint8_t* shared_key, const uint8_t* secret_key, const uint8_t* public_key)
+{
+	uint32_t i, num = ~0, curr = 0;
+
+	for (i = 0; i < MAX_KEYS_PER_SLOT; ++i) {
+		int index = public_key[30] * MAX_KEYS_PER_SLOT + i;
+
+		if (shared_keys->keys[index].stored) {
+			if (CryptoCore::publicKeyCmp(public_key, shared_keys->keys[index].public_key) == 0) {
+				memcpy(shared_key, shared_keys->keys[index].shared_key, crypto_box_BEFORENMBYTES);
+				++shared_keys->keys[index].times_requested;
+				shared_keys->keys[index].time_last_requested = unix_time();
+				return;
+			}
+
+			if (num != 0) {
+				if (is_timeout(shared_keys->keys[index].time_last_requested, KEYS_TIMEOUT)) {
+					num = 0;
+					curr = index;
+				}
+				else if (num > shared_keys->keys[index].times_requested) {
+					num = shared_keys->keys[index].times_requested;
+					curr = index;
+				}
+			}
+		}
+		else {
+			if (num != 0) {
+				num = 0;
+				curr = index;
+			}
+		}
+	}
+
+	CryptoCore::encryptPrecompute(public_key, secret_key, shared_key);
+
+	if (num != (uint32_t)~0) {
+		shared_keys->keys[curr].stored = 1;
+		shared_keys->keys[curr].times_requested = 1;
+		memcpy(shared_keys->keys[curr].public_key, public_key, crypto_box_PUBLICKEYBYTES);
+		memcpy(shared_keys->keys[curr].shared_key, shared_key, crypto_box_BEFORENMBYTES);
+		shared_keys->keys[curr].time_last_requested = unix_time();
+	}
+}
+
+
 /* Check if client with public_key is already in list of length length.If it is then set its corresponding timestamp to current time.
  * If the id is already in the list with a different ip_port, update it.  TODO: Maybe optimize this. *  return True(1) or False(0)
  *检查带有public_key的客户端是否已经在长度列表中。如果是，则将其相应的时间戳设置为当前时间。 
@@ -801,7 +876,6 @@ int DHT::init(std::shared_ptr<Networking_Core> net)
 	m_ping = new Ping;
 	m_ping->init( static_cast<std::shared_ptr<DHT>>( this));
 
-
 	
 	m_net->networkingRegisterhandler(NET_PACKET_GET_NODES, &handle_getnodes, this);
 	m_net->networkingRegisterhandler(NET_PACKET_SEND_NODES_IPV6, &handle_sendnodes_ipv6, this);
@@ -817,7 +891,7 @@ int DHT::init(std::shared_ptr<Networking_Core> net)
 	
 	for (uint32_t i = 0; i < DHT_FAKE_FRIEND_NUMBER; ++i)
 	{
-		uint8_t random_key_bytes[crypto_box_PUBLICKEYBYTES];
+		uint8_t random_key_bytes[crypto_box_PUBLICKEYBYTES]{};
 		randombytes(random_key_bytes, sizeof(random_key_bytes));
 
 		if (addfriend(random_key_bytes, 0, 0, 0, 0) != 0)
@@ -1513,9 +1587,8 @@ bool DHT::nodeAddableToCloseList( const uint8_t* public_key, IP_Port ip_port)
    }
 
 
-   /*  return friend number from the public_key.
- *  return -1 if a failure occurs.
- */
+   /*  return friend number from the public_key.从public_key返回朋友号码。
+ *  return -1 if a failure occurs. */
    int DHT::friend_number(const uint8_t* public_key)
    {
 	   uint32_t i;
@@ -1845,7 +1918,7 @@ bool DHT::nodeAddableToCloseList( const uint8_t* public_key, IP_Port ip_port)
 	* ip_callback is the callback of a function that will be called when the ip address	* is found along with arguments data and number.
 	* lock_count will be set to a non zero number that must be passed to DHT_delfriend()	* to properly remove the callback.
 	*将新朋友添加到朋友列表中。 public_key必须是crypto_box_PUBLICKEYBYTES个字节。 ip_callback是一个函数的回调，
-	当找到ip地址以及参数data和number时	，将调用该函数。 ock_count将设置为非零数字，必须传递给DHT_delfriend（）才能正确删除回调。
+	当找到ip地址以及参数data和number时	，将调用该函数。 lock_count将设置为非零数字，必须传递给DHT_delfriend（）才能正确删除回调。
 	*  return 0 if success.
 	*  return -1 if failure (friends list is full).
 	*/
@@ -1899,3 +1972,135 @@ bool DHT::nodeAddableToCloseList( const uint8_t* public_key, IP_Port ip_port)
 	   friend1->num_to_bootstrap = get_close_nodes(friend1->public_key, friend1->to_bootstrap, 0, 1, 0);
 	   return 0;
    }
+
+
+   void DHT_bootstrap(DHT* dht, IP_Port ip_port, const uint8_t* public_key)
+   {
+	   /*#ifdef ENABLE_ASSOC_DHT
+		  if (dht->assoc) {
+			  IPPTs ippts;
+			  ippts.ip_port = ip_port;
+			  ippts.timestamp = 0;
+
+			  Assoc_add_entry(dht->assoc, public_key, &ippts, NULL, 0);
+		  }
+		  #endif*/
+
+	    dht->getnodes (ip_port, public_key, dht->selfPublicKey(), NULL);
+   }
+
+
+
+
+   /*  return 0 if we are not connected to the DHT.
+	*  return 1 if we are.
+	*/
+   int DHT_isconnected(const DHT* dht)
+   {
+	   uint32_t i;
+	   unix_time_update();
+	   for (i = 0; i < LCLIENT_LIST; ++i) {
+		   const Client_data* client = &dht->m_closeClientlist[i];
+
+		   if (!is_timeout(client->assoc4.timestamp, BAD_NODE_TIMEOUT) ||
+			   !is_timeout(client->assoc6.timestamp, BAD_NODE_TIMEOUT))
+			   return 1;
+	   }
+
+	   return 0;
+   }
+
+   
+/*  return 0 if we are not connected or only connected to lan peers with the DHT.
+ *  return 1 if we are.
+ */
+int DHT_non_lan_connected(const DHT *dht)
+{
+    uint32_t i;
+    unix_time_update();
+
+    for (i = 0; i < LCLIENT_LIST; ++i) {
+        const Client_data *client = &dht->m_closeClientlist[i];
+
+        if (!is_timeout(client->assoc4.timestamp, BAD_NODE_TIMEOUT) && LAN_ip(client->assoc4.ip_port.ip) == -1)
+            return 1;
+
+        if (!is_timeout(client->assoc6.timestamp, BAD_NODE_TIMEOUT) && LAN_ip(client->assoc6.ip_port.ip) == -1)
+            return 1;
+
+    }
+
+    return 0;
+}
+
+/* Put up to max_num nodes in nodes from the closelist.
+ *
+ * return the number of nodes.
+ */
+uint16_t list_nodes(Client_data* list, unsigned int length, Node_format* nodes, uint16_t max_num)
+{
+	if (max_num == 0)
+		return 0;
+
+	uint16_t count = 0;
+
+	unsigned int i;
+
+	for (i = length; i != 0; --i) {
+		IPPTsPng* assoc = NULL;
+
+		if (!is_timeout(list[i - 1].assoc4.timestamp, BAD_NODE_TIMEOUT))
+			assoc = &list[i - 1].assoc4;
+
+		if (!is_timeout(list[i - 1].assoc6.timestamp, BAD_NODE_TIMEOUT)) {
+			if (assoc == NULL)
+				assoc = &list[i - 1].assoc6;
+			else if (rand() % 2)
+				assoc = &list[i - 1].assoc6;
+		}
+
+		if (assoc != NULL) {
+			memcpy(nodes[count].public_key, list[i - 1].public_key, crypto_box_PUBLICKEYBYTES);
+			nodes[count].ip_port = assoc->ip_port;
+			++count;
+
+			if (count >= max_num)
+				return count;
+		}
+	}
+
+	return count;
+}
+
+
+/* Put up to max_num nodes in nodes from the closelist.
+ *
+ * return the number of nodes.
+ */
+uint16_t closelist_nodes(DHT* dht, Node_format* nodes, uint16_t max_num)
+{
+	return list_nodes(dht->m_closeClientlist , LCLIENT_LIST, nodes, max_num);
+}
+
+/* Put up to max_num nodes in nodes from the random friends.
+ *
+ * return the number of nodes.
+ */
+uint16_t randfriends_nodes(DHT* dht, Node_format* nodes, uint16_t max_num)
+{
+	if (max_num == 0)
+		return 0;
+
+	uint16_t count = 0;
+	unsigned int i, r = rand();
+
+	for (i = 0; i < DHT_FAKE_FRIEND_NUMBER; ++i) {
+		count += list_nodes(dht->m_friendsList[(i + r) % DHT_FAKE_FRIEND_NUMBER].client_list, MAX_FRIEND_CLIENTS, nodes + count,
+			max_num - count);
+
+		if (count >= max_num)
+			break;
+	}
+
+	return count;
+}

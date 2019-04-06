@@ -7,6 +7,10 @@
 
 #include <memory>
 #include "dht.h"
+#include "net_crypto.h"
+#include "onion.h"
+#include "onion_announce.h"
+#include "onion_client.h"
 
 typedef struct {
 	uint8_t ipv6enabled;
@@ -15,6 +19,7 @@ typedef struct {
 	uint16_t port_range[2];
 	uint16_t tcp_server_port;
 } Messenger_Options;
+
 
 
 class LIBWGIM_EXPORT Messenger : public QObject
@@ -41,6 +46,11 @@ private:
 	Messenger_Options m_messengerOption {};
 	std::shared_ptr<DHT> m_dht{new DHT};
 	unsigned int m_error = 0;
+	Net_Crypto* m_net_crypto{ new Net_Crypto };
+
+	Onion* onion;
+	Onion_Announce* onion_a;
+	Onion_Client* onion_c;
 
 	
 };
